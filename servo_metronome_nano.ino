@@ -1,4 +1,8 @@
+#if defined(ARDUINO_ARCH_ESP32)
+#include <ESP32Servo.h>
+#else
 #include <Servo.h>
+#endif
 
 // ----------------------
 // Hardware configuration
@@ -154,7 +158,17 @@ void setup() {
   pinMode(BTN_UP_PIN, INPUT_PULLUP);
   pinMode(BTN_DOWN_PIN, INPUT_PULLUP);
 
+#if defined(ARDUINO_ARCH_ESP32)
+  // Required by ESP32Servo; safe frequency for analog servos.
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
+  metronomeServo.setPeriodHertz(50);
+  metronomeServo.attach(SERVO_PIN, 500, 2400); // min/max pulse width in microseconds
+#else
   metronomeServo.attach(SERVO_PIN);
+#endif
   metronomeServo.write(CENTER_ANGLE);
 
   Serial.begin(115200);

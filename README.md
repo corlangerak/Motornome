@@ -1,12 +1,12 @@
-# Arduino Nano Servo Metronome
+# Arduino Servo Metronome (Nano + ESP32)
 
 This repository contains an Arduino sketch for a **servo-driven metronome stick** where tempo is controlled by **serial commands and/or two buttons** (no potentiometer required).
 
 ## File
 - `servo_metronome_nano.ino`
 
-## Wiring (Arduino Nano)
-- Servo signal -> `D9`
+## Wiring
+- Servo signal -> `D9` on Nano (or change `SERVO_PIN` for ESP32, e.g. `18`)
 - Servo power -> external 5V supply (recommended)
 - Servo GND -> external GND
 - Nano GND -> same external GND (common ground)
@@ -16,6 +16,13 @@ Optional button control:
 - `D3` -> button -> `GND` (BPM down)
 
 Buttons use `INPUT_PULLUP`, so they are active when pressed to ground.
+
+
+## Board compatibility
+- **Arduino Nano / AVR**: uses `Servo.h` (built in with many AVR setups).
+- **ESP32**: uses `ESP32Servo.h` automatically via `#if defined(ARDUINO_ARCH_ESP32)`.
+
+If you compile for ESP32, install the **ESP32Servo** library from Library Manager.
 
 ## Behavior
 - BPM range is **40 to 1440**.
