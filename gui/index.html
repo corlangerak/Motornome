@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Motornome</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Courier New', Courier, monospace;
+  background: #0d0d1a;
+  color: #e0e0e0;
+  min-height: 100vh;
+  user-select: none;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 24px;
+  background: #10101e;
+  border-bottom: 1px solid #22223a;
+}
+header h1 {
+  font-size: 1.25rem;
+  letter-spacing: 0.35em;
+  color: #fff;
+}
+#connectBtn {
+  padding: 7px 20px;
+  background: #141430;
+  border: 1px solid #00d4ff;
+  color: #00d4ff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+#connectBtn:hover { background: #1c2e50; }
+#connectBtn.on    { border-color: #00ff88; color: #00ff88; background: #0d2a1a; }
+#statusText { font-size: 0.8rem; color: #555; }
+#statusText.on { color: #00ff88; }
+
+/* ── Main grid ──────────────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  padding: 18px;
+}
+@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+/* ── Panel ──────────────────────────────────────────────────────────────── */
+.panel {
+  background: #10101e;
+  border-radius: 6px;
+  border: 1px solid #1e1e32;
+  padding: 14px;
+}
+.panel.s1 { border-top: 3px solid #00d4ff; }
+.panel.s2 { border-top: 3px solid #ff6b35; }
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.servo-label { font-size: 0.75rem; letter-spacing: 0.25em; }
+.s1 .servo-label { color: #00d4ff; }
+.s2 .servo-label { color: #ff6b35; }
+.bpm-display {
+  font-size: 2.1rem;
+  font-weight: bold;
+  color: #fff;
+  letter-spacing: 0.05em;
+}
+
+/* ── Canvas ─────────────────────────────────────────────────────────────── */
+canvas.editor {
+  width: 100%;
+  display: block;
+  border-radius: 4px;
+  cursor: crosshair;
+}
+.hint {
+  font-size: 0.68rem;
+  color: #444;
+  margin: 4px 0 11px;
+}
+
+/* ── Controls ───────────────────────────────────────────────────────────── */
+.controls { display: flex; flex-direction: column; gap: 10px; }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lbl {
+  font-size: 0.7rem;
+  color: #555;
+  letter-spacing: 0.1em;
+  min-width: 62px;
+}
+input[type="range"] { flex: 1; height: 4px; cursor: pointer; }
+.s1 input[type="range"] { accent-color: #00d4ff; }
+.s2 input[type="range"] { accent-color: #ff6b35; }
+
+.num-input {
+  width: 68px;
+  background: #0d0d1a;
+  border: 1px solid #22223a;
+  color: #e0e0e0;
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 3px 7px;
+  border-radius: 3px;
+  text-align: right;
+}
+
+.btns { display: flex; gap: 7px; }
+.btn {
+  flex: 1;
+  padding: 8px 6px;
+  border: 1px solid #22223a;
+  background: #0d0d1a;
+  color: #aaa;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  border-radius: 3px;
+  transition: background 0.12s;
+}
+.btn:hover           { background: #1a1a2e; }
+.btn.play            { border-color: #00ff88; color: #00ff88; }
+.btn.stop            { border-color: #ff4444; color: #ff4444; }
+.btn.seq             { border-color: #ffcc00; color: #ffcc00; }
+.btn.ramp            { border-color: #aa88ff; color: #aa88ff; }
+.btn.clr             { border-color: #333;    color: #555; }
+.btn.play:hover      { background: #082a14; }
+.btn.stop:hover      { background: #2a0808; }
+.btn.seq:hover       { background: #2a2400; }
+
+.dur-val { font-size: 0.8rem; color: #666; min-width: 30px; }
+
+.info {
+  background: #0a0a18;
+  border: 1px solid #1e1e32;
+  border-radius: 3px;
+  padding: 5px 9px;
+  font-size: 0.68rem;
+  color: #555;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>MOTORNOME</h1>
+  <button id="connectBtn" onclick="toggleConnect()">Connect</button>
+  <span id="statusText">Disconnected</span>
+</header>
+
+<div class="grid">
+
+  <!-- Servo 1 -->
+  <div class="panel s1" id="panel1">
+    <div class="panel-head">
+      <span class="servo-label">SERVO 1</span>
+      <span class="bpm-display" id="bpmDisp1">120.0</span>
+    </div>
+    <canvas id="cv1" class="editor" width="760" height="220"></canvas>
+    <p class="hint">Click — add point &nbsp;·&nbsp; Drag — move &nbsp;·&nbsp; Right-click — delete</p>
+    <div class="controls">
+      <div class="row">
+        <span class="lbl">LIVE BPM</span>
+        <input type="range" id="sl1" min="1" max="1000" value="120"
+               oninput="onSlider(1,this.value)">
+        <input type="number" id="ni1" class="num-input" min="1" max="1000" value="120"
+               oninput="onNumInput(1,this.value)">
+      </div>
+      <div class="btns">
+        <button class="btn play" onclick="cmdPlay(1)">&#9654; PLAY</button>
+        <button class="btn stop" onclick="cmdStop(1)">&#9632; STOP</button>
+        <button class="btn seq"  onclick="cmdPlaySeq(1)">&#9654; SEQ</button>
+      </div>
+      <div class="row">
+        <span class="lbl">DURATION</span>
+        <input type="range" id="dr1" min="5" max="120" value="30"
+               oninput="onDuration(1,this.value)">
+        <span class="dur-val" id="dv1">30s</span>
+        <button class="btn ramp" onclick="doRamp(1)">RAMP&uarr;</button>
+        <button class="btn clr"  onclick="doClear(1)">CLR</button>
+      </div>
+      <div class="info" id="info1">Draw a BPM curve above, then press &#9654; SEQ — or use &#9654; PLAY for live BPM.</div>
+    </div>
+  </div>
+
+  <!-- Servo 2 -->
+  <div class="panel s2" id="panel2">
+    <div class="panel-head">
+      <span class="servo-label">SERVO 2</span>
+      <span class="bpm-display" id="bpmDisp2">120.0</span>
+    </div>
+    <canvas id="cv2" class="editor" width="760" height="220"></canvas>
+    <p class="hint">Click — add point &nbsp;·&nbsp; Drag — move &nbsp;·&nbsp; Right-click — delete</p>
+    <div class="controls">
+      <div class="row">
+        <span class="lbl">LIVE BPM</span>
+        <input type="range" id="sl2" min="1" max="1000" value="120"
+               oninput="onSlider(2,this.value)">
+        <input type="number" id="ni2" class="num-input" min="1" max="1000" value="120"
+               oninput="onNumInput(2,this.value)">
+      </div>
+      <div class="btns">
+        <button class="btn play" onclick="cmdPlay(2)">&#9654; PLAY</button>
+        <button class="btn stop" onclick="cmdStop(2)">&#9632; STOP</button>
+        <button class="btn seq"  onclick="cmdPlaySeq(2)">&#9654; SEQ</button>
+      </div>
+      <div class="row">
+        <span class="lbl">DURATION</span>
+        <input type="range" id="dr2" min="5" max="120" value="30"
+               oninput="onDuration(2,this.value)">
+        <span class="dur-val" id="dv2">30s</span>
+        <button class="btn ramp" onclick="doRamp(2)">RAMP&uarr;</button>
+        <button class="btn clr"  onclick="doClear(2)">CLR</button>
+      </div>
+      <div class="info" id="info2">Draw a BPM curve above, then press &#9654; SEQ — or use &#9654; PLAY for live BPM.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+// ════════════════════════════════════════════════════════════════════════════
+// CurveEditor
+// ════════════════════════════════════════════════════════════════════════════
+class CurveEditor {
+  constructor(canvas, accent) {
+    this.canvas   = canvas;
+    this.ctx      = canvas.getContext('2d');
+    this.accent   = accent;      // '#00d4ff' or '#ff6b35'
+    this.points   = [];          // [{id, t, bpm}]  sorted by t
+    this.duration = 30;          // seconds  (X axis)
+    this.maxBpm   = 1000;        // (Y axis)
+    this.dragId   = null;
+    this.hoverId  = null;
+    this.playhead = null;        // seconds or null
+    this._uid     = 0;
+    this._pad     = { t: 28, r: 18, b: 28, l: 44 };
+    this._bindEvents();
+    this._render();
+  }
+
+  // ── Coordinate helpers ───────────────────────────────────────────────────
+  _iw() { return this.canvas.width  - this._pad.l - this._pad.r; }
+  _ih() { return this.canvas.height - this._pad.t - this._pad.b; }
+
+  _toCanvas(t, bpm) {
+    return {
+      x: this._pad.l + (t / this.duration) * this._iw(),
+      y: this._pad.t + (1 - bpm / this.maxBpm) * this._ih()
+    };
+  }
+
+  _fromCanvas(x, y) {
+    return {
+      t:   Math.max(0, Math.min(this.duration, (x - this._pad.l) / this._iw() * this.duration)),
+      bpm: Math.max(0, Math.min(this.maxBpm,   (1 - (y - this._pad.t) / this._ih()) * this.maxBpm))
+    };
+  }
+
+  // Scale mouse coords to canvas resolution (handles CSS scaling)
+  _mouse(e) {
+    const r  = this.canvas.getBoundingClientRect();
+    const sx = this.canvas.width  / r.width;
+    const sy = this.canvas.height / r.height;
+    return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
+  }
+
+  _findNear(x, y, r = 11) {
+    for (const p of this.points) {
+      const c = this._toCanvas(p.t, p.bpm);
+      if ((c.x - x) ** 2 + (c.y - y) ** 2 <= r * r) return p.id;
+    }
+    return null;
+  }
+
+  // ── Events ───────────────────────────────────────────────────────────────
+  _bindEvents() {
+    const cv = this.canvas;
+
+    cv.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      const { x, y } = this._mouse(e);
+      const id = this._findNear(x, y);
+      if (id !== null) {
+        this.dragId = id;
+      } else {
+        const d  = this._fromCanvas(x, y);
+        const pt = { id: this._uid++, t: d.t, bpm: d.bpm };
+        this.points.push(pt);
+        this.points.sort((a, b) => a.t - b.t);
+        this.dragId = pt.id;
+        this._render();
+      }
+    });
+
+    cv.addEventListener('mousemove', e => {
+      const { x, y } = this._mouse(e);
+      this.hoverId = this._findNear(x, y);
+      if (this.dragId !== null) {
+        const pt = this.points.find(p => p.id === this.dragId);
+        if (pt) {
+          const d = this._fromCanvas(x, y);
+          pt.t   = d.t;
+          pt.bpm = d.bpm;
+          this.points.sort((a, b) => a.t - b.t);
+        }
+      }
+      this._render();
+    });
+
+    cv.addEventListener('mouseup',    () => { this.dragId = null; });
+    cv.addEventListener('mouseleave', () => { this.dragId = null; this.hoverId = null; this._render(); });
+
+    cv.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      const { x, y } = this._mouse(e);
+      const id = this._findNear(x, y);
+      if (id !== null) {
+        this.points = this.points.filter(p => p.id !== id);
+        this._render();
+      }
+    });
+  }
+
+  // ── Rendering ────────────────────────────────────────────────────────────
+  _render() {
+    const ctx = this.ctx;
+    const W   = this.canvas.width;
+    const H   = this.canvas.height;
+    const p   = this._pad;
+    const iw  = this._iw();
+    const ih  = this._ih();
+
+    // Background
+    ctx.fillStyle = '#0a0a18';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#0d0d22';
+    ctx.fillRect(p.l, p.t, iw, ih);
+
+    // Grid — vertical (time)
+    const tStep = this.duration <= 30 ? 5 : this.duration <= 60 ? 10 : 20;
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'center';
+    for (let t = 0; t <= this.duration; t += tStep) {
+      const { x } = this._toCanvas(t, 0);
+      ctx.strokeStyle = '#181830';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, p.t); ctx.lineTo(x, H - p.b); ctx.stroke();
+      ctx.fillStyle = '#3a3a55';
+      ctx.fillText(t + 's', x, H - p.b + 12);
+    }
+
+    // Grid — horizontal (BPM)
+    ctx.textAlign = 'right';
+    for (let bpm = 0; bpm <= this.maxBpm; bpm += 100) {
+      const { y } = this._toCanvas(0, bpm);
+      ctx.strokeStyle = bpm % 500 === 0 ? '#222238' : '#161628';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(p.l, y); ctx.lineTo(W - p.r, y); ctx.stroke();
+      if (bpm % 200 === 0) {
+        ctx.fillStyle = '#3a3a55';
+        ctx.fillText(bpm, p.l - 4, y + 3);
+      }
+    }
+
+    // Border
+    ctx.strokeStyle = '#222238';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(p.l, p.t, iw, ih);
+
+    // ── Curve & fill ────────────────────────────────────────────────────────
+    if (this.points.length >= 2) {
+      const pts = this.points;
+      const first = this._toCanvas(pts[0].t, pts[0].bpm);
+
+      // Filled area under curve
+      ctx.beginPath();
+      ctx.moveTo(first.x, first.y);
+      for (let i = 1; i < pts.length; i++) {
+        const c = this._toCanvas(pts[i].t, pts[i].bpm);
+        ctx.lineTo(c.x, c.y);
+      }
+      const lastC = this._toCanvas(pts[pts.length - 1].t, 0);
+      ctx.lineTo(lastC.x, H - p.b);
+      ctx.lineTo(first.x, H - p.b);
+      ctx.closePath();
+      const grad = ctx.createLinearGradient(0, p.t, 0, H - p.b);
+      grad.addColorStop(0, this.accent + '44');
+      grad.addColorStop(1, this.accent + '00');
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Line
+      ctx.beginPath();
+      ctx.moveTo(first.x, first.y);
+      for (let i = 1; i < pts.length; i++) {
+        const c = this._toCanvas(pts[i].t, pts[i].bpm);
+        ctx.lineTo(c.x, c.y);
+      }
+      ctx.strokeStyle = this.accent;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.85;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // ── Playhead ─────────────────────────────────────────────────────────────
+    if (this.playhead !== null) {
+      const { x } = this._toCanvas(this.playhead, 0);
+      ctx.strokeStyle = '#ffffff55';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(x, p.t); ctx.lineTo(x, H - p.b); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // ── Points ───────────────────────────────────────────────────────────────
+    for (const pt of this.points) {
+      const c       = this._toCanvas(pt.t, pt.bpm);
+      const active  = pt.id === this.dragId || pt.id === this.hoverId;
+      const radius  = active ? 8 : 5;
+
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle   = active ? '#ffffff' : this.accent;
+      ctx.fill();
+      ctx.strokeStyle = active ? this.accent : '#000a';
+      ctx.lineWidth   = 1.5;
+      ctx.stroke();
+
+      // Tooltip on hover/drag
+      if (active) {
+        const label = `${pt.t.toFixed(1)}s  /  ${Math.round(pt.bpm)} BPM`;
+        ctx.font = '10px monospace';
+        const tw  = ctx.measureText(label).width;
+        const tx  = Math.min(c.x - tw / 2, W - p.r - tw - 6);
+        const ty  = c.y > p.t + 26 ? c.y - 14 : c.y + 22;
+        ctx.fillStyle = '#000c';
+        ctx.fillRect(tx - 4, ty - 12, tw + 8, 16);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(label, tx, ty);
+      }
+    }
+  }
+
+  // ── Public API ────────────────────────────────────────────────────────────
+  setDuration(s) { this.duration = s; this._render(); }
+  clear()        { this.points = []; this.playhead = null; this._render(); }
+  setPlayhead(s) { this.playhead = s; this._render(); }
+  clearPlayhead(){ this.playhead = null; this._render(); }
+
+  addRampPreset(targetBpm) {
+    this.clear();
+    this.points = [
+      { id: this._uid++, t: 0,             bpm: 0         },
+      { id: this._uid++, t: this.duration, bpm: targetBpm }
+    ];
+    this._render();
+  }
+
+  // Returns [{timeMs, bpm}, ...] for BLE upload
+  getSequence() {
+    return this.points.map(p => ({
+      timeMs: Math.round(p.t * 1000),
+      bpm:    Math.round(p.bpm * 10) / 10
+    }));
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BLE
+// ════════════════════════════════════════════════════════════════════════════
+const SVC_UUID  = '12340000-0000-0000-0000-000000000000';
+const CH1_UUID  = '12340001-0000-0000-0000-000000000000';
+const CH2_UUID  = '12340002-0000-0000-0000-000000000000';
+const STAT_UUID = '12340003-0000-0000-0000-000000000000';
+
+let bleDevice = null;
+let bleCh = [null, null];   // bleCh[0] = servo 1, bleCh[1] = servo 2
+let connected = false;
+
+async function toggleConnect() {
+  if (connected) {
+    if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
+    setConnected(false);
+    return;
+  }
+
+  try {
+    setInfo(0, 'Scanning for Motornome…');
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'Motornome' }],
+      optionalServices: [SVC_UUID]
+    });
+    bleDevice.addEventListener('gattserverdisconnected', () => setConnected(false));
+
+    const server  = await bleDevice.gatt.connect();
+    const service = await server.getPrimaryService(SVC_UUID);
+    bleCh[0] = await service.getCharacteristic(CH1_UUID);
+    bleCh[1] = await service.getCharacteristic(CH2_UUID);
+
+    // Optional status notifications
+    try {
+      const stat = await service.getCharacteristic(STAT_UUID);
+      await stat.startNotifications();
+      stat.addEventListener('characteristicvaluechanged', onStatus);
+    } catch (_) { /* not critical */ }
+
+    setConnected(true);
+  } catch (e) {
+    setInfo(0, 'Connect failed: ' + e.message);
+    console.error(e);
+  }
+}
+
+function setConnected(val) {
+  connected = val;
+  const btn = document.getElementById('connectBtn');
+  const txt = document.getElementById('statusText');
+  if (val) {
+    btn.textContent = 'Disconnect'; btn.className = 'on';
+    txt.textContent = 'Connected to Motornome'; txt.className = 'on';
+    setInfo(0, 'Connected. Use sliders and buttons below.');
+    setInfo(1, 'Connected. Use sliders and buttons below.');
+  } else {
+    btn.textContent = 'Connect'; btn.className = '';
+    txt.textContent = 'Disconnected'; txt.className = '';
+    bleCh = [null, null];
+  }
+}
+
+function onStatus(e) {
+  const v = e.target.value;
+  if (v.byteLength >= 8) {
+    const b1 = v.getFloat32(0, true);
+    const b2 = v.getFloat32(4, true);
+    document.getElementById('bpmDisp1').textContent = b1.toFixed(1);
+    document.getElementById('bpmDisp2').textContent = b2.toFixed(1);
+  }
+}
+
+// ── Command builders ─────────────────────────────────────────────────────────
+function mkSetBpm(bpm)  {
+  const b = new ArrayBuffer(5);
+  const v = new DataView(b);
+  v.setUint8(0, 0x01); v.setFloat32(1, bpm, true);
+  return b;
+}
+function mkPlay()       { return new Uint8Array([0x02]).buffer; }
+function mkStop()       { return new Uint8Array([0x03]).buffer; }
+function mkPlaySeq()    { return new Uint8Array([0x05]).buffer; }
+
+function mkLoadSeq(seq) {
+  const n   = Math.min(seq.length, 62);
+  const buf = new ArrayBuffer(3 + n * 8);
+  const v   = new DataView(buf);
+  v.setUint8(0, 0x04);
+  v.setUint16(1, n, true);
+  for (let i = 0; i < n; i++) {
+    v.setUint32(3 + i * 8,     seq[i].timeMs, true);
+    v.setFloat32(3 + i * 8 + 4, seq[i].bpm,  true);
+  }
+  return buf;
+}
+
+async function send(idx, buf, withResp = false) {
+  const ch = bleCh[idx];
+  if (!ch) return;
+  try {
+    if (withResp) await ch.writeValue(buf);
+    else          await ch.writeValueWithoutResponse(buf);
+  } catch (e) {
+    // Fallback: some browsers only expose writeValue
+    try { await ch.writeValue(buf); } catch (_) {}
+  }
+}
+
+// ── Live BPM ─────────────────────────────────────────────────────────────────
+const bpmTimers = [null, null];
+
+function onSlider(s, val) {
+  const v = parseFloat(val);
+  document.getElementById(`ni${s}`).value = v;
+  document.getElementById(`bpmDisp${s}`).textContent = v.toFixed(1);
+  scheduleBpm(s - 1, v);
+}
+function onNumInput(s, val) {
+  const v = Math.min(1000, Math.max(1, parseFloat(val) || 1));
+  document.getElementById(`sl${s}`).value = v;
+  document.getElementById(`bpmDisp${s}`).textContent = v.toFixed(1);
+  scheduleBpm(s - 1, v);
+}
+function scheduleBpm(idx, bpm) {
+  clearTimeout(bpmTimers[idx]);
+  bpmTimers[idx] = setTimeout(() => send(idx, mkSetBpm(bpm)), 30);
+}
+
+// ── Transport ─────────────────────────────────────────────────────────────────
+async function cmdPlay(s) {
+  await send(s - 1, mkPlay());
+  setInfo(s - 1, `Playing at ${document.getElementById('sl'+s).value} BPM…`);
+}
+
+async function cmdStop(s) {
+  await send(s - 1, mkStop());
+  stopPlayhead(s - 1);
+  setInfo(s - 1, 'Stopped.');
+}
+
+async function cmdPlaySeq(s) {
+  const ed  = editors[s - 1];
+  const seq = ed.getSequence();
+  if (seq.length < 2) {
+    setInfo(s - 1, 'Add at least 2 points to the curve first.'); return;
+  }
+  const durMs = seq[seq.length - 1].timeMs;
+  await send(s - 1, mkLoadSeq(seq), true);          // with response for larger payload
+  await delay(60);
+  await send(s - 1, mkPlaySeq());
+  startPlayhead(s - 1, durMs);
+  setInfo(s - 1,
+    `Sequence playing: ${seq.length} keyframes over ${(durMs/1000).toFixed(1)}s`);
+}
+
+// ── Curve controls ────────────────────────────────────────────────────────────
+function onDuration(s, val) {
+  document.getElementById(`dv${s}`).textContent = val + 's';
+  editors[s - 1].setDuration(parseInt(val));
+}
+function doClear(s) { editors[s - 1].clear(); setInfo(s - 1, 'Curve cleared.'); }
+function doRamp(s) {
+  const bpm = parseFloat(document.getElementById(`sl${s}`).value);
+  editors[s - 1].addRampPreset(bpm);
+  setInfo(s - 1, `Ramp preset: 0 → ${Math.round(bpm)} BPM over ${editors[s-1].duration}s`);
+}
+
+// ── Playhead ─────────────────────────────────────────────────────────────────
+const phTimers = [null, null];
+
+function startPlayhead(idx, totalMs) {
+  stopPlayhead(idx);
+  const start = Date.now();
+  const ed    = editors[idx];
+  phTimers[idx] = setInterval(() => {
+    const el = Date.now() - start;
+    if (el >= totalMs) { stopPlayhead(idx); setInfo(idx, 'Sequence complete.'); return; }
+    ed.setPlayhead(el / 1000);
+  }, 50);
+}
+function stopPlayhead(idx) {
+  clearInterval(phTimers[idx]);
+  editors[idx].clearPlayhead();
+}
+
+// ── Utility ──────────────────────────────────────────────────────────────────
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+function setInfo(idx, msg) {
+  document.getElementById(`info${idx + 1}`).textContent = msg;
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+const editors = [
+  new CurveEditor(document.getElementById('cv1'), '#00d4ff'),
+  new CurveEditor(document.getElementById('cv2'), '#ff6b35')
+];
+</script>
+</body>
+</html>
